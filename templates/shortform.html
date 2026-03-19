@@ -473,13 +473,55 @@
 
     <!-- 가운데: 미리보기 -->
     <div class="preview-area">
-      <div class="preview-player-wrap" style="height: calc(100vh - 200px)">
+      <!-- 일반 클립 미리보기 -->
+      <div id="clipPreviewWrap" class="preview-player-wrap" style="height: calc(100vh - 200px)">
         <video id="previewPlayer" class="preview-player" style="display:none"></video>
         <canvas id="previewCanvas" class="preview-player"></canvas>
       </div>
-      <div class="preview-controls">
+      <div id="clipControls" class="preview-controls">
         <button class="preview-btn" id="playPauseBtn" onclick="togglePlayPause()">▶ 재생</button>
         <button class="preview-btn primary" onclick="downloadCurrent()">⬇ 다운로드</button>
+      </div>
+
+      <!-- 구간 편집 소스 미리보기 (숨김) -->
+      <div id="sourcePreviewWrap" style="display:none;width:100%;max-width:800px;flex:1;display:none;flex-direction:column;gap:10px">
+        <video id="sourcePlayer" style="width:100%;max-height:calc(100vh - 320px);border-radius:10px;background:#111;object-fit:contain"></video>
+        <!-- 소스 시크바 -->
+        <div style="padding:0 4px">
+          <input id="sourceSeekBar" type="range" min="0" max="100" step="0.1" value="0"
+            style="width:100%;accent-color:var(--accent);height:6px"
+            oninput="onSourceSeek(this.value)">
+        </div>
+        <!-- 시간 + 컨트롤 -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+          <span id="sourceTimeDisplay" style="font-size:13px;font-family:monospace;color:var(--muted);min-width:100px;text-align:center">0:00 / 0:00</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+          <button onclick="sourceSkip(-5)" class="preview-btn" style="padding:6px 12px;font-size:12px">-5초</button>
+          <button onclick="sourceSkip(-1)" class="preview-btn" style="padding:6px 12px;font-size:12px">-1초</button>
+          <button id="sourcePlayBtn" onclick="toggleSourcePlay()" class="preview-btn" style="padding:8px 24px;font-size:14px">▶ 재생</button>
+          <button onclick="sourceSkip(1)" class="preview-btn" style="padding:6px 12px;font-size:12px">+1초</button>
+          <button onclick="sourceSkip(5)" class="preview-btn" style="padding:6px 12px;font-size:12px">+5초</button>
+        </div>
+        <!-- 시작/끝 설정 버튼 -->
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button onclick="setTrimPoint('start')" style="flex:1;max-width:200px;padding:10px;border-radius:8px;border:2px solid var(--success);background:rgba(74,222,128,0.1);color:var(--success);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s">
+            ◀ 시작점 설정
+          </button>
+          <button onclick="setTrimPoint('end')" style="flex:1;max-width:200px;padding:10px;border-radius:8px;border:2px solid var(--danger);background:rgba(248,113,113,0.1);color:var(--danger);font-size:13px;font-weight:700;cursor:pointer;transition:all .2s">
+            끝점 설정 ▶
+          </button>
+        </div>
+        <!-- 선택된 구간 표시 -->
+        <div id="trimSelectionBar" style="position:relative;height:24px;background:var(--surface2);border-radius:6px;overflow:hidden;margin:0 4px">
+          <div id="trimRegionBar" style="position:absolute;top:0;height:100%;background:rgba(124,111,255,0.3);border-left:3px solid var(--success);border-right:3px solid var(--danger);transition:left .15s,width .15s"></div>
+          <div id="trimPlayheadBar" style="position:absolute;top:0;width:2px;height:100%;background:#fff;transition:left .05s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:0 4px;font-size:11px;color:var(--muted)">
+          <span id="trimStartLabel" style="color:var(--success)">시작: 0:00</span>
+          <span id="trimDurLabel" style="color:var(--accent);font-weight:700">구간: 0:00</span>
+          <span id="trimEndLabel" style="color:var(--danger)">끝: 0:00</span>
+        </div>
       </div>
     </div>
 
@@ -490,6 +532,7 @@
       <div class="detail-tabs">
         <button class="detail-tab active" onclick="switchDetailTab('title')">쇼츠 제목</button>
         <button class="detail-tab" onclick="switchDetailTab('info')">클립 정보</button>
+        <button class="detail-tab" onclick="switchDetailTab('trim')">구간 편집</button>
       </div>
 
       <!-- 쇼츠 제목 탭 -->
@@ -634,6 +677,64 @@
             <input id="titleLetterS" type="range" min="-10" max="20" value="0" style="flex:1;accent-color:var(--accent)" oninput="updateTitleStyle();document.getElementById('titleLetterSVal').textContent=this.value">
             <span id="titleLetterSVal" style="font-size:13px;min-width:28px;text-align:right">0</span>
           </div>
+        </div>
+      </div>
+
+      <!-- 구간 편집 탭 -->
+      <div id="tabDetailTrim" style="display:none">
+        <div class="detail-section-title">구간 편집</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">
+            왼쪽 영상을 재생하면서 원하는 지점에서<br>
+            <span style="color:var(--success);font-weight:700">시작점</span> /
+            <span style="color:var(--danger);font-weight:700">끝점</span> 버튼을 누르세요
+          </div>
+
+          <!-- 현재 설정된 구간 정보 -->
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <div style="flex:1;background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:var(--success);font-weight:700;margin-bottom:4px">시작점</div>
+              <div id="trimStartDisplay" style="font-size:16px;font-weight:700;font-family:monospace">0:00</div>
+            </div>
+            <div style="flex:1;background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:var(--accent);font-weight:700;margin-bottom:4px">구간 길이</div>
+              <div id="trimDurDisplay" style="font-size:16px;font-weight:700;font-family:monospace;color:var(--accent)">0:00</div>
+            </div>
+            <div style="flex:1;background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:10px;color:var(--danger);font-weight:700;margin-bottom:4px">끝점</div>
+              <div id="trimEndDisplay" style="font-size:16px;font-weight:700;font-family:monospace">0:00</div>
+            </div>
+          </div>
+
+          <!-- 미세 조정 -->
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600">미세 조정</div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <span style="font-size:11px;min-width:32px;color:var(--success);font-weight:600;line-height:28px">시작</span>
+            <button onclick="adjustTrimPoint('start',-1)" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px">-1초</button>
+            <button onclick="adjustTrimPoint('start',-0.5)" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px">-0.5</button>
+            <button onclick="adjustTrimPoint('start',0.5)" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px">+0.5</button>
+            <button onclick="adjustTrimPoint('start',1)" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px">+1초</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <span style="font-size:11px;min-width:32px;color:var(--danger);font-weight:600;line-height:28px">끝</span>
+            <button onclick="adjustTrimPoint('end',-1)" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px">-1초</button>
+            <button onclick="adjustTrimPoint('end',-0.5)" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px">-0.5</button>
+            <button onclick="adjustTrimPoint('end',0.5)" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px">+0.5</button>
+            <button onclick="adjustTrimPoint('end',1)" style="padding:4px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:11px">+1초</button>
+          </div>
+        </div>
+
+        <!-- 구간 미리보기 -->
+        <button onclick="playTrimRegion()" style="width:100%;background:var(--surface);border:1px solid var(--accent);color:var(--accent);padding:10px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;transition:all .2s">
+          ▶ 설정 구간만 재생
+        </button>
+
+        <!-- 적용 버튼 -->
+        <button id="btnApplyTrim" onclick="applyTrimRecut()" style="width:100%;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s">
+          ✂ 구간 적용 (영상 재생성)
+        </button>
+        <div style="text-align:center;margin-top:6px;font-size:11px;color:var(--muted)">
+          변경된 구간으로 영상을 다시 자릅니다
         </div>
       </div>
 
@@ -856,6 +957,17 @@ function renderShortsList(shorts) {
 }
 
 function selectShort(idx) {
+  // If in trim mode, exit first
+  if (currentDetailTab === 'trim') {
+    exitTrimMode();
+    currentDetailTab = 'title';
+    document.querySelectorAll('.detail-tab').forEach((t, i) =>
+      t.classList.toggle('active', i === 0));
+    document.getElementById('tabDetailTitle').style.display = 'block';
+    document.getElementById('tabDetailInfo').style.display = 'none';
+    document.getElementById('tabDetailTrim').style.display = 'none';
+  }
+
   // ── 현재 클립 스타일 저장 ──
   clipStyleStore[currentShortIdx] = {
     style:    Object.assign({}, titleStyle),
@@ -1101,11 +1213,22 @@ function drawTitleOnCanvas(ctx, title) {
   });
 }
 
+let currentDetailTab = 'title';
+
 function switchDetailTab(tab) {
+  const prevTab = currentDetailTab;
+  currentDetailTab = tab;
   document.querySelectorAll('.detail-tab').forEach((t, i) =>
-    t.classList.toggle('active', (i===0 && tab==='title') || (i===1 && tab==='info')));
+    t.classList.toggle('active', (i===0 && tab==='title') || (i===1 && tab==='info') || (i===2 && tab==='trim')));
   document.getElementById('tabDetailTitle').style.display = tab==='title' ? 'block' : 'none';
   document.getElementById('tabDetailInfo').style.display  = tab==='info'  ? 'block' : 'none';
+  document.getElementById('tabDetailTrim').style.display   = tab==='trim'  ? 'block' : 'none';
+
+  if (tab === 'trim') {
+    enterTrimMode();
+  } else if (prevTab === 'trim') {
+    exitTrimMode();
+  }
 }
 
 function selectColor(el, type) {
@@ -1497,6 +1620,236 @@ async function openProject(sessionId, title) {
     selectShort(0);
   } catch(e) {
     showToast('프로젝트를 불러올 수 없어요', 'error');
+  }
+}
+
+// ── 구간 편집 (Trim) ──
+let sourceDuration = 0;
+let trimStart = 0;
+let trimEnd = 0;
+let trimModeActive = false;
+let sourceTimeUpdateRaf = null;
+
+function enterTrimMode() {
+  const s = shortsData[currentShortIdx];
+  if (!s) return;
+
+  trimModeActive = true;
+
+  // Hide clip preview, show source preview
+  document.getElementById('clipPreviewWrap').style.display = 'none';
+  document.getElementById('clipControls').style.display = 'none';
+  const srcWrap = document.getElementById('sourcePreviewWrap');
+  srcWrap.style.display = 'flex';
+
+  // Load source video
+  const srcVideo = document.getElementById('sourcePlayer');
+  const srcUrl = `/api/sf/source-stream/${s.session_id}`;
+  if (!srcVideo.src || !srcVideo.src.includes(s.session_id)) {
+    srcVideo.src = srcUrl;
+    srcVideo.load();
+  }
+
+  srcVideo.onloadedmetadata = () => {
+    sourceDuration = srcVideo.duration;
+    document.getElementById('sourceSeekBar').max = sourceDuration;
+    // Set initial trim points from current segments
+    if (s.segments && s.segments.length) {
+      trimStart = s.segments[0].start;
+      trimEnd = s.segments[s.segments.length - 1].end;
+    }
+    updateTrimUI();
+    // Seek to start point
+    srcVideo.currentTime = trimStart;
+  };
+
+  // If already loaded
+  if (srcVideo.readyState >= 1 && srcVideo.duration) {
+    sourceDuration = srcVideo.duration;
+    document.getElementById('sourceSeekBar').max = sourceDuration;
+    if (s.segments && s.segments.length) {
+      trimStart = s.segments[0].start;
+      trimEnd = s.segments[s.segments.length - 1].end;
+    }
+    updateTrimUI();
+    srcVideo.currentTime = trimStart;
+  }
+
+  // Time update loop
+  srcVideo.ontimeupdate = onSourceTimeUpdate;
+}
+
+function exitTrimMode() {
+  trimModeActive = false;
+  const srcVideo = document.getElementById('sourcePlayer');
+  srcVideo.pause();
+
+  // Hide source preview, show clip preview
+  document.getElementById('sourcePreviewWrap').style.display = 'none';
+  document.getElementById('clipPreviewWrap').style.display = '';
+  document.getElementById('clipControls').style.display = '';
+}
+
+function onSourceTimeUpdate() {
+  const srcVideo = document.getElementById('sourcePlayer');
+  const ct = srcVideo.currentTime;
+
+  // Update seek bar
+  document.getElementById('sourceSeekBar').value = ct;
+  // Update time display
+  document.getElementById('sourceTimeDisplay').textContent = `${fmtDur(ct)} / ${fmtDur(sourceDuration)}`;
+
+  // Update playhead on selection bar
+  if (sourceDuration > 0) {
+    const pct = (ct / sourceDuration) * 100;
+    document.getElementById('trimPlayheadBar').style.left = pct + '%';
+  }
+
+  // Auto-stop at trim end during region playback
+  if (srcVideo._regionPlay && ct >= trimEnd) {
+    srcVideo.pause();
+    srcVideo._regionPlay = false;
+    showToast('구간 재생 완료', 'success');
+  }
+}
+
+function onSourceSeek(val) {
+  const srcVideo = document.getElementById('sourcePlayer');
+  srcVideo.currentTime = parseFloat(val);
+}
+
+function toggleSourcePlay() {
+  const srcVideo = document.getElementById('sourcePlayer');
+  if (srcVideo.paused) {
+    srcVideo._regionPlay = false;
+    srcVideo.play();
+    document.getElementById('sourcePlayBtn').textContent = '⏸ 일시정지';
+  } else {
+    srcVideo.pause();
+    document.getElementById('sourcePlayBtn').textContent = '▶ 재생';
+  }
+}
+
+// Source play/pause event listeners
+document.addEventListener('DOMContentLoaded', () => {
+  const srcVideo = document.getElementById('sourcePlayer');
+  if (srcVideo) {
+    srcVideo.addEventListener('play', () => {
+      document.getElementById('sourcePlayBtn').textContent = '⏸ 일시정지';
+    });
+    srcVideo.addEventListener('pause', () => {
+      document.getElementById('sourcePlayBtn').textContent = '▶ 재생';
+    });
+  }
+});
+
+function sourceSkip(sec) {
+  const srcVideo = document.getElementById('sourcePlayer');
+  srcVideo.currentTime = Math.max(0, Math.min(sourceDuration, srcVideo.currentTime + sec));
+}
+
+function setTrimPoint(type) {
+  const srcVideo = document.getElementById('sourcePlayer');
+  const ct = srcVideo.currentTime;
+
+  if (type === 'start') {
+    trimStart = ct;
+    if (trimStart >= trimEnd) trimEnd = Math.min(sourceDuration, trimStart + 1);
+    showToast(`시작점: ${fmtDur(trimStart)}`, 'success');
+  } else {
+    trimEnd = ct;
+    if (trimEnd <= trimStart) trimStart = Math.max(0, trimEnd - 1);
+    showToast(`끝점: ${fmtDur(trimEnd)}`, 'success');
+  }
+  updateTrimUI();
+}
+
+function adjustTrimPoint(type, delta) {
+  if (type === 'start') {
+    trimStart = Math.max(0, Math.min(trimEnd - 0.5, trimStart + delta));
+  } else {
+    trimEnd = Math.min(sourceDuration, Math.max(trimStart + 0.5, trimEnd + delta));
+  }
+  updateTrimUI();
+  // Seek to the adjusted point
+  const srcVideo = document.getElementById('sourcePlayer');
+  srcVideo.currentTime = type === 'start' ? trimStart : trimEnd;
+}
+
+function updateTrimUI() {
+  const dur = trimEnd - trimStart;
+  document.getElementById('trimStartDisplay').textContent = fmtDur(trimStart);
+  document.getElementById('trimEndDisplay').textContent = fmtDur(trimEnd);
+  document.getElementById('trimDurDisplay').textContent = fmtDur(Math.max(0, dur));
+  document.getElementById('trimStartLabel').textContent = `시작: ${fmtDur(trimStart)}`;
+  document.getElementById('trimEndLabel').textContent = `끝: ${fmtDur(trimEnd)}`;
+  document.getElementById('trimDurLabel').textContent = `구간: ${fmtDur(Math.max(0, dur))}`;
+
+  // Update region bar
+  if (sourceDuration > 0) {
+    const leftPct = (trimStart / sourceDuration) * 100;
+    const widthPct = ((trimEnd - trimStart) / sourceDuration) * 100;
+    document.getElementById('trimRegionBar').style.left = leftPct + '%';
+    document.getElementById('trimRegionBar').style.width = widthPct + '%';
+  }
+}
+
+function playTrimRegion() {
+  const srcVideo = document.getElementById('sourcePlayer');
+  srcVideo.currentTime = trimStart;
+  srcVideo._regionPlay = true;
+  srcVideo.play();
+  showToast(`${fmtDur(trimStart)} ~ ${fmtDur(trimEnd)} 재생`, 'success');
+}
+
+async function applyTrimRecut() {
+  const s = shortsData[currentShortIdx];
+  if (!s) return;
+
+  const btn = document.getElementById('btnApplyTrim');
+  btn.disabled = true;
+  btn.textContent = '⏳ 재생성 중...';
+
+  try {
+    const newSegments = [{ start: Math.round(trimStart * 100) / 100, end: Math.round(trimEnd * 100) / 100 }];
+
+    const res = await fetch('/api/sf/recut', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: s.session_id,
+        short_id: s.id,
+        segments: newSegments
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '재생성 실패');
+
+    // Update local data
+    s.segments = newSegments;
+    s.duration = data.duration;
+    s.timeline = data.timeline;
+
+    // Update clip video (for when we switch back)
+    const clipVideo = document.getElementById('previewPlayer');
+    clipVideo.src = (s.stream_url || s.download_url) + '?t=' + Date.now();
+    clipVideo.load();
+
+    // Update UI
+    document.getElementById('detailTimeline').textContent = data.timeline;
+    const items = document.querySelectorAll('.short-item');
+    if (items[currentShortIdx]) {
+      items[currentShortIdx].querySelector('.short-thumb-badge').textContent = fmtDur(data.duration);
+      items[currentShortIdx].querySelector('.short-item-dur').textContent = data.timeline;
+    }
+
+    showToast('구간 적용 완료!', 'success');
+  } catch (e) {
+    showToast(`오류: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✂ 구간 적용 (영상 재생성)';
   }
 }
 

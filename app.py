@@ -544,6 +544,71 @@ def sf_suggest_title():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/sf/source-stream/<session_id>')
+def sf_source_stream(session_id):
+    """Stream the original source video for segment editing preview."""
+    source_path = sf.OUTPUT_DIR / session_id / "source.mp4"
+    if not source_path.exists():
+        return jsonify({"error": "소스 영상 없음"}), 404
+    return send_file(str(source_path), mimetype="video/mp4")
+
+
+@app.route('/api/sf/recut', methods=['POST'])
+def sf_recut():
+    """Re-cut a clip with new start/end segments."""
+    data = request.json
+    session_id = data.get("session_id")
+    short_id = data.get("short_id")
+    new_segments = data.get("segments")  # [{start, end}, ...]
+
+    if not session_id or not short_id or not new_segments:
+        return jsonify({"error": "필수 파라미터 누락"}), 400
+
+    source_path = sf.OUTPUT_DIR / session_id / "source.mp4"
+    if not source_path.exists():
+        return jsonify({"error": "소스 영상 없음"}), 404
+
+    output_path = str(sf.OUTPUT_DIR / session_id / f"{short_id}.mp4")
+
+    try:
+        success = sf.cut_video(str(source_path), new_segments, output_path)
+        if not success:
+            return jsonify({"error": "영상 재생성 실패"}), 500
+
+        # Update meta.json with new segments
+        meta_path = sf.OUTPUT_DIR / session_id / "meta.json"
+        if meta_path.exists():
+            with open(meta_path, "r", encoding="utf-8") as f:
+                metas = json.load(f)
+            for item in metas:
+                if item["id"] == short_id:
+                    item["segments"] = new_segments
+                    duration = sum(s["end"] - s["start"] for s in new_segments)
+                    item["duration"] = round(duration, 1)
+                    s0 = new_segments[0]["start"]
+                    se = new_segments[-1]["end"]
+                    item["timeline"] = f"{int(s0//60)}분 {int(s0%60):02d}초 ~ {int(se//60)}분 {int(se%60):02d}초"
+                    break
+            with open(meta_path, "w", encoding="utf-8") as f:
+                json.dump(metas, f, ensure_ascii=False, indent=2)
+
+        duration = sum(s["end"] - s["start"] for s in new_segments)
+        s0 = new_segments[0]["start"]
+        se = new_segments[-1]["end"]
+        timeline = f"{int(s0//60)}분 {int(s0%60):02d}초 ~ {int(se//60)}분 {int(se%60):02d}초"
+
+        return jsonify({
+            "success": True,
+            "duration": round(duration, 1),
+            "timeline": timeline
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/static/fonts/<path:filename>')
 def serve_font(filename):
     fonts_dir = os.path.join(APP_ROOT, "fonts")
