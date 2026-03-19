@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VideoMaker - AI 영상 자동 생성</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f0f0f; color: #eee; font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+
+  .header {
+    background: #1a1a2e; padding: 24px 40px; border-bottom: 2px solid #e50914;
+    text-align: center;
+  }
+  .header h1 { font-size: 28px; font-weight: 800; color: #fff; margin-bottom: 6px; }
+  .header p { font-size: 14px; color: #888; }
+
+  .container {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 60px 24px;
+  }
+
+  .cards {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+    max-width: 800px; width: 100%;
+  }
+
+  .card {
+    background: #1a1a1a; border: 2px solid #2a2a2a; border-radius: 16px;
+    padding: 48px 36px; text-align: center; cursor: pointer;
+    transition: all 0.3s ease; text-decoration: none; color: inherit;
+  }
+  .card:hover {
+    border-color: #e50914; transform: translateY(-6px);
+    box-shadow: 0 12px 40px rgba(229, 9, 20, 0.15);
+  }
+
+  .card-icon { font-size: 56px; margin-bottom: 20px; display: block; }
+  .card-title { font-size: 22px; font-weight: 700; margin-bottom: 10px; color: #fff; }
+  .card-desc { font-size: 14px; color: #888; line-height: 1.6; }
+
+  .card-badge {
+    display: inline-block; margin-top: 20px;
+    background: #e5091422; color: #e50914; border: 1px solid #e50914;
+    padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+
+  .footer {
+    text-align: center; padding: 20px; color: #444; font-size: 12px;
+    border-top: 1px solid #1a1a1a;
+  }
+
+  @media (max-width: 640px) {
+    .cards { grid-template-columns: 1fr; gap: 20px; }
+    .card { padding: 36px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>VideoMaker</h1>
+  <p>AI 기반 영상 자동 생성 파이프라인</p>
+</div>
+
+<div class="container">
+  <div class="cards">
+    <a class="card" href="/longform">
+      <span class="card-icon">&#127916;</span>
+      <div class="card-title">롱폼 만들기</div>
+      <div class="card-desc">
+        키워드 검색 &rarr; 벤치 분석 &rarr; 대본 생성 &rarr;<br>
+        이미지 + TTS + 자막 &rarr; 영상 완성
+      </div>
+      <div class="card-badge">풀 자동화 파이프라인</div>
+    </a>
+
+    <a class="card" href="/shortform">
+      <span class="card-icon">&#9986;&#65039;</span>
+      <div class="card-title">숏폼 만들기</div>
+      <div class="card-desc">
+        유튜브 링크 또는 파일 업로드 &rarr;<br>
+        AI 구간 분석 &rarr; 숏폼 자동 생성
+      </div>
+      <div class="card-badge">Claude + Whisper AI</div>
+    </a>
+  </div>
+</div>
+
+<div class="footer">
+  VideoMaker &copy; 2024 &mdash; Powered by Claude, OpenAI, ElevenLabs
+</div>
+
+</body>
+</html>

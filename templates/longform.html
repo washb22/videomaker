@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LongForm Maker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f0f0f; color: #eee; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  .header { background: #1a1a2e; padding: 20px 40px; border-bottom: 2px solid #e50914; display: flex; align-items: center; gap: 16px; }
+  .header h1 { font-size: 24px; font-weight: 700; color: #fff; }
+  .header span { color: #e50914; font-size: 13px; background: #e5091422; padding: 4px 10px; border-radius: 20px; border: 1px solid #e50914; }
+  .header a { color: #888; text-decoration: none; font-size: 13px; margin-left: auto; }
+  .header a:hover { color: #fff; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+
+  .pipeline { display: flex; gap: 8px; margin-bottom: 40px; flex-wrap: wrap; }
+  .step-btn { padding: 10px 18px; border-radius: 8px; border: 1px solid #333; background: #1a1a1a; color: #888; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .step-btn.active { background: #e50914; border-color: #e50914; color: #fff; font-weight: 600; }
+  .step-btn.done { background: #1a3a1a; border-color: #2d8a2d; color: #4caf50; }
+  .step-btn:hover:not(.active) { border-color: #555; color: #ccc; }
+
+  .panel { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 28px; margin-bottom: 24px; display: none; }
+  .panel.active { display: block; }
+  .panel h2 { font-size: 18px; margin-bottom: 6px; }
+  .panel p.desc { color: #888; font-size: 13px; margin-bottom: 20px; }
+
+  label { display: block; font-size: 13px; color: #aaa; margin-bottom: 6px; }
+  input[type=text], textarea, select { width: 100%; background: #111; border: 1px solid #333; color: #eee; border-radius: 8px; padding: 10px 14px; font-size: 14px; outline: none; transition: border 0.2s; }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: #e50914; }
+  textarea { resize: vertical; min-height: 120px; }
+
+  .btn { padding: 12px 28px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
+  .btn-primary { background: #e50914; color: #fff; }
+  .btn-primary:hover { background: #c0070f; }
+  .btn-secondary { background: #2a2a2a; color: #eee; border: 1px solid #444; }
+  .btn-secondary:hover { background: #333; }
+  .btn-sm { padding: 8px 16px; font-size: 12px; }
+  .btn-group { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+  .result-box { background: #111; border: 1px solid #2a2a2a; border-radius: 8px; padding: 16px; margin-top: 16px; font-size: 13px; }
+  .result-box.success { border-color: #2d8a2d; }
+  .result-box.error { border-color: #8a2d2d; color: #ff6b6b; }
+
+  .loading { display: none; align-items: center; gap: 10px; color: #888; font-size: 13px; margin-top: 12px; }
+  .loading.show { display: flex; }
+  .spinner { width: 18px; height: 18px; border: 2px solid #333; border-top-color: #e50914; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .search-controls { display: flex; gap: 10px; margin-bottom: 16px; align-items: flex-end; flex-wrap: wrap; }
+  .search-controls .main-input { flex: 1; min-width: 200px; }
+  .search-controls .sub-select { min-width: 140px; }
+
+  .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 20px; }
+  .video-card { background: #111; border: 2px solid #2a2a2a; border-radius: 10px; overflow: hidden; cursor: pointer; transition: all 0.2s; position: relative; }
+  .video-card:hover { border-color: #555; transform: translateY(-2px); }
+  .video-card.selected { border-color: #e50914; background: #1a0a0a; }
+  .video-card .thumb { position: relative; aspect-ratio: 16/9; overflow: hidden; background: #000; }
+  .video-card .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .video-card .duration-badge { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.85); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+  .video-card .check-badge { position: absolute; top: 8px; left: 8px; background: #e50914; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; z-index: 2; }
+  .video-card.selected .check-badge { display: flex; }
+  .video-card .info { padding: 12px; }
+  .video-card .v-title { font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .video-card .channel { font-size: 11px; color: #888; margin-bottom: 8px; }
+  .video-card .stats { display: flex; gap: 10px; font-size: 11px; }
+  .video-card .view-count { color: #e50914; font-weight: 700; }
+  .video-card .stat-item { color: #666; }
+
+  .select-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #111; border: 1px solid #2a2a2a; border-radius: 8px; margin-top: 16px; }
+  .selected-count { font-size: 13px; color: #aaa; }
+  .selected-count strong { color: #e50914; font-size: 16px; }
+
+  .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .analysis-card { background: #111; border: 1px solid #2a2a2a; border-radius: 8px; padding: 16px; }
+  .analysis-card h3 { font-size: 11px; color: #e50914; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .analysis-card p, .analysis-card li { font-size: 13px; color: #ccc; line-height: 1.6; }
+  .analysis-card ul { padding-left: 16px; }
+
+  .topic-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+  .topic-item { background: #111; border: 1px solid #333; border-radius: 8px; padding: 10px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+  .topic-item:hover { border-color: #e50914; background: #1a0a0a; }
+  .topic-item.selected { border-color: #e50914; background: #1a0a0a; color: #e50914; }
+
+  .url-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .url-row input { flex: 1; }
+  .remove-btn { background: #2a0a0a; border: 1px solid #e50914; color: #e50914; border-radius: 8px; padding: 0 14px; cursor: pointer; font-size: 16px; }
+
+  .final-card { background: linear-gradient(135deg, #1a0a0a, #1a1a2e); border: 1px solid #e50914; border-radius: 12px; padding: 32px; text-align: center; margin-top: 16px; }
+  .final-card h2 { font-size: 22px; margin-bottom: 8px; }
+  .final-card p { color: #888; margin-bottom: 20px; }
+  .tag { display: inline-block; background: #1a3a1a; color: #4caf50; border-radius: 4px; padding: 2px 8px; font-size: 11px; }
+
+  .shortform-settings { background: #111; border: 1px solid #333; border-radius: 10px; padding: 20px; margin-top: 20px; text-align: left; }
+  .shortform-settings h3 { font-size: 15px; margin-bottom: 14px; color: #fff; }
+  .sf-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+  .sf-row > div { flex: 1; min-width: 140px; }
+  .sf-progress { margin-top: 20px; }
+  .sf-step { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; color: #555; }
+  .sf-step.active { color: #e50914; }
+  .sf-step.done { color: #4caf50; }
+  .sf-step .sf-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; flex-shrink: 0; }
+  .sf-step.active .sf-dot { background: #e50914; animation: pulse 1s infinite; }
+  .sf-step.done .sf-dot { background: #4caf50; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .sf-results { margin-top: 20px; }
+  .sf-result-item { display: flex; align-items: center; gap: 12px; padding: 10px; background: #111; border: 1px solid #2a2a2a; border-radius: 8px; margin-bottom: 8px; }
+  .sf-result-item .sf-num { background: #e50914; color: #fff; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .sf-result-item .sf-info { flex: 1; }
+  .sf-result-item .sf-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .sf-result-item .sf-meta { font-size: 11px; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>&#127916; LongForm Maker</h1>
+  <span>키워드 검색 &rarr; 벤치분석 &rarr; 대본 &rarr; 영상 자동화</span>
+  <a href="/">&larr; 홈으로</a>
+</div>
+
+<div class="container">
+
+  <div class="pipeline">
+    <button class="step-btn active" onclick="goStep(0)" id="nav0">&#128269; 키워드 검색</button>
+    <button class="step-btn" onclick="goStep(1)" id="nav1">&#9312; 자막 수집</button>
+    <button class="step-btn" onclick="goStep(2)" id="nav2">&#9313; 벤치 분석</button>
+    <button class="step-btn" onclick="goStep(3)" id="nav3">&#9314; 대본 생성</button>
+    <button class="step-btn" onclick="goStep(4)" id="nav4">&#9315; 이미지 생성</button>
+    <button class="step-btn" onclick="goStep(5)" id="nav5">&#9316; TTS 음성</button>
+    <button class="step-btn" onclick="goStep(6)" id="nav6">&#9317; 무음 제거</button>
+    <button class="step-btn" onclick="goStep(7)" id="nav7">&#9318; 영상 조합</button>
+  </div>
+
+  <!-- 키워드 검색 -->
+  <div class="panel active" id="panel0">
+    <h2>&#128269; 키워드로 벤치 영상 찾기</h2>
+    <p class="desc">조회수 높은 벤치마킹 영상을 찾아서 선택하세요. 선택한 영상의 자막을 자동으로 수집합니다. (최대 5개)</p>
+
+    <div class="search-controls">
+      <div class="main-input">
+        <label>검색 키워드</label>
+        <input type="text" id="keyword-input" placeholder="예: 커피 끊는 법, 재테크, 다이어트..." onkeydown="if(event.key==='Enter') searchVideos()">
+      </div>
+      <div class="sub-select">
+        <label>정렬 기준</label>
+        <select id="order-select">
+          <option value="viewCount">조회수 높은 순</option>
+          <option value="relevance">관련성 순</option>
+          <option value="date">최신순</option>
+        </select>
+      </div>
+      <div class="sub-select">
+        <label>검색 개수</label>
+        <select id="count-select">
+          <option value="10">10개</option>
+          <option value="15">15개</option>
+          <option value="20">20개</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="searchVideos()" style="flex-shrink:0; align-self:flex-end;">검색</button>
+    </div>
+
+    <div class="loading" id="loading0"><div class="spinner"></div>YouTube 검색 중...</div>
+
+    <div id="video-grid-wrap" style="display:none;">
+      <div class="video-grid" id="video-grid"></div>
+      <div class="select-bar">
+        <span class="selected-count">선택된 영상 <strong id="selected-count">0</strong>개</span>
+        <button class="btn btn-primary" onclick="goToCollect()">선택 완료 &rarr; 자막 수집</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 자막 수집 -->
+  <div class="panel" id="panel1">
+    <h2>&#9312; 자막 수집</h2>
+    <p class="desc">선택한 영상들의 자막을 자동 수집합니다. URL을 직접 추가할 수도 있어요.</p>
+    <label>수집할 영상 URL</label>
+    <div id="url-list"></div>
+    <button class="btn btn-secondary btn-sm" onclick="addUrl()" style="margin-top:8px;">+ URL 직접 추가</button>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="collectSubtitles()">자막 수집 시작</button>
+      <button class="btn btn-secondary" onclick="goStep(0)">&larr; 다시 검색</button>
+    </div>
+    <div class="loading" id="loading1"><div class="spinner"></div>자막 수집 중...</div>
+    <div id="result1"></div>
+  </div>
+
+  <!-- 벤치 분석 -->
+  <div class="panel" id="panel2">
+    <h2>&#9313; 벤치 채널 분석</h2>
+    <p class="desc">수집한 자막을 AI가 분석합니다. 말투, 후킹 패턴, 영상 결, 추천 주제를 추출합니다.</p>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="analyzeBench()">AI 분석 시작</button>
+    </div>
+    <div class="loading" id="loading2"><div class="spinner"></div>AI 분석 중... (30초~1분 소요)</div>
+    <div id="result2"></div>
+  </div>
+
+  <!-- 대본 생성 -->
+  <div class="panel" id="panel3">
+    <h2>&#9314; 대본 생성</h2>
+    <p class="desc">추천 주제를 선택하거나 직접 입력하세요. 벤치 채널 결로 대본을 생성합니다.</p>
+    <label>AI 추천 주제</label>
+    <div class="topic-grid" id="topic-grid"><p style="color:#555;font-size:13px;">벤치 분석 후 자동으로 채워집니다</p></div>
+    <div style="margin-top:16px;">
+      <label>영상 주제 직접 입력</label>
+      <input type="text" id="topic-input" placeholder="예: 하루 커피 한 잔을 끊으면 벌어지는 일">
+    </div>
+    <div style="margin-top:12px;">
+      <label>추가 지시사항 (선택)</label>
+      <textarea id="custom-prompt" placeholder="예: 30대 직장인 타겟, 공감형 말투로, 마지막에 구독 CTA 포함"></textarea>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="generateScript()">대본 생성</button>
+    </div>
+    <div class="loading" id="loading3"><div class="spinner"></div>대본 생성 중...</div>
+    <div id="result3"></div>
+  </div>
+
+  <!-- 이미지 생성 -->
+  <div class="panel" id="panel4">
+    <h2>&#9315; 장면별 이미지 생성</h2>
+    <p class="desc">대본의 각 장면에 맞는 이미지를 DALL-E로 자동 생성합니다.</p>
+    <label>이미지 스타일</label>
+    <select id="image-style">
+      <option value="사실적인 사진">사실적인 사진</option>
+      <option value="수채화">수채화 일러스트</option>
+      <option value="애니메이션">애니메이션 스타일</option>
+      <option value="미니멀">미니멀 플랫 디자인</option>
+      <option value="3D 렌더">3D 렌더링</option>
+    </select>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="generateImages()">이미지 생성</button>
+    </div>
+    <div class="loading" id="loading4"><div class="spinner"></div>이미지 생성 중... (장면 수에 따라 수분 소요)</div>
+    <div id="result4"></div>
+  </div>
+
+  <!-- TTS -->
+  <div class="panel" id="panel5">
+    <h2>&#9316; TTS 음성 생성</h2>
+    <p class="desc">ElevenLabs로 나레이션 음성을 자동 생성합니다.</p>
+    <label>음성 선택 <span id="voice-loading" style="color:#888;font-size:11px;">불러오는 중...</span></label>
+    <select id="voice-select" style="margin-bottom:8px;">
+      <option value="">목소리 로딩 중...</option>
+    </select>
+    <div style="margin-bottom:12px;">
+      <audio id="voice-preview" controls style="width:100%;height:36px;display:none;"></audio>
+      <span style="font-size:11px;color:#666;">목소리 선택하면 미리 듣기 가능</span>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="generateTTS()">음성 생성</button>
+    </div>
+    <div class="loading" id="loading5"><div class="spinner"></div>TTS 생성 중...</div>
+    <div id="result5"></div>
+  </div>
+
+  <!-- 무음 제거 -->
+  <div class="panel" id="panel6">
+    <h2>&#9317; 무음 구간 자동 제거</h2>
+    <p class="desc">TTS 음성에서 불필요한 무음 구간을 제거해 템포를 빠르게 합니다.</p>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="removeSilence()">무음 제거 실행</button>
+      <button class="btn btn-secondary" onclick="skipSilence()">건너뛰기</button>
+    </div>
+    <div class="loading" id="loading6"><div class="spinner"></div>무음 제거 중...</div>
+    <div id="result6"></div>
+  </div>
+
+  <!-- 영상 조합 -->
+  <div class="panel" id="panel7">
+    <h2>&#9318; 최종 영상 조합</h2>
+    <p class="desc">이미지 + 음성 + 자막을 합쳐서 최종 영상을 완성합니다.</p>
+    <div style="display:flex;gap:20px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+        <input type="checkbox" id="add-subtitle" checked> 자막 삽입
+      </label>
+      <select id="subtitle-style" style="width:auto;">
+        <option value="default">기본 흰색</option>
+        <option value="yellow">노란색 강조</option>
+        <option value="black_bg">검은 배경</option>
+        <option value="minimal">미니멀</option>
+      </select>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="assembleVideo()">&#127916; 영상 완성</button>
+    </div>
+    <div class="loading" id="loading7"><div class="spinner"></div>영상 렌더링 중... (수분 소요)</div>
+    <div id="result7"></div>
+  </div>
+
+</div>
+
+<script>
+const SESSION_ID = 'session_' + Date.now();
+
+// -- 목소리 목록 로드 --
+async function loadVoices() {
+  try {
+    const res = await fetch('/api/voices');
+    const data = await res.json();
+    if (data.success && data.voices.length > 0) {
+      const sel = document.getElementById('voice-select');
+      sel.innerHTML = data.voices.map(v => {
+        const desc = v.description ? ` (${v.description})` : '';
+        const badge = v.category === 'cloned' ? ' ★' : '';
+        return `<option value="${v.voice_id}">${v.name}${desc}${badge}</option>`;
+      }).join('');
+      document.getElementById('voice-loading').textContent = `${data.voices.length}개 목소리`;
+      sel.addEventListener('change', previewVoice);
+    }
+  } catch(e) {
+    document.getElementById('voice-loading').textContent = '로드 실패';
+  }
+}
+
+function previewVoice() {
+  const audio = document.getElementById('voice-preview');
+  audio.style.display = 'none';
+}
+
+loadVoices();
+let selectedVideos = new Set();
+let videoDataMap = {};
+
+function goStep(n) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.step-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel' + n).classList.add('active');
+  document.getElementById('nav' + n).classList.add('active');
+}
+
+function markDone(n) {
+  document.getElementById('nav' + n).classList.add('done');
+  document.getElementById('nav' + n).classList.remove('active');
+}
+
+function showLoading(n, show) {
+  document.getElementById('loading' + n).classList.toggle('show', show);
+}
+
+// -- 키워드 검색 --
+async function searchVideos() {
+  const keyword = document.getElementById('keyword-input').value.trim();
+  if (!keyword) return alert('키워드를 입력하세요');
+  showLoading(0, true);
+  document.getElementById('video-grid-wrap').style.display = 'none';
+  try {
+    const res = await fetch('/api/search', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        keyword,
+        max_results: parseInt(document.getElementById('count-select').value),
+        order: document.getElementById('order-select').value
+      })
+    });
+    const data = await res.json();
+    showLoading(0, false);
+    if (data.success) {
+      renderVideoGrid(data.data.videos);
+    } else {
+      alert('검색 오류: ' + data.error);
+    }
+  } catch(e) {
+    showLoading(0, false);
+    alert('오류: ' + e.message);
+  }
+}
+
+function renderVideoGrid(videos) {
+  videoDataMap = {};
+  selectedVideos.clear();
+  updateSelectedCount();
+  const grid = document.getElementById('video-grid');
+  grid.innerHTML = videos.map(v => {
+    videoDataMap[v.video_id] = v;
+    return `
+    <div class="video-card" id="card-${v.video_id}" onclick="toggleVideo('${v.video_id}')">
+      <div class="check-badge">&#10003;</div>
+      <div class="thumb">
+        <img src="${v.thumbnail}" alt="" loading="lazy">
+        <span class="duration-badge">${v.duration}</span>
+      </div>
+      <div class="info">
+        <div class="v-title">${v.title}</div>
+        <div class="channel">&#128250; ${v.channel} &middot; ${v.published}</div>
+        <div class="stats">
+          <span class="view-count">&#128065; ${v.view_count_str}</span>
+          <span class="stat-item">&#128077; ${fmt(v.like_count)}</span>
+          <span class="stat-item">&#128172; ${fmt(v.comment_count)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('video-grid-wrap').style.display = 'block';
+}
+
+function toggleVideo(vid) {
+  if (selectedVideos.has(vid)) {
+    selectedVideos.delete(vid);
+    document.getElementById('card-' + vid).classList.remove('selected');
+  } else {
+    if (selectedVideos.size >= 5) { alert('최대 5개까지 선택 가능합니다'); return; }
+    selectedVideos.add(vid);
+    document.getElementById('card-' + vid).classList.add('selected');
+  }
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  document.getElementById('selected-count').textContent = selectedVideos.size;
+}
+
+function fmt(n) {
+  if (!n) return '0';
+  if (n >= 100000000) return Math.floor(n/100000000) + '억';
+  if (n >= 10000) return Math.floor(n/10000) + '만';
+  if (n >= 1000) return Math.floor(n/1000) + '천';
+  return String(n);
+}
+
+function goToCollect() {
+  if (selectedVideos.size === 0) return alert('영상을 1개 이상 선택하세요');
+  const urlList = document.getElementById('url-list');
+  urlList.innerHTML = '';
+  selectedVideos.forEach(vid => {
+    const v = videoDataMap[vid];
+    const row = document.createElement('div');
+    row.className = 'url-row';
+    row.innerHTML = `<input type="text" class="url-input" value="${v.url}" style="color:#aaa;" readonly><button class="remove-btn" onclick="removeUrl(this)">&#10005;</button>`;
+    urlList.appendChild(row);
+  });
+  markDone(0);
+  goStep(1);
+}
+
+// -- 자막 수집 --
+function addUrl() {
+  const list = document.getElementById('url-list');
+  if (list.children.length >= 5) return alert('최대 5개');
+  const row = document.createElement('div');
+  row.className = 'url-row';
+  row.innerHTML = '<input type="text" placeholder="https://youtu.be/..." class="url-input"><button class="remove-btn" onclick="removeUrl(this)">&#10005;</button>';
+  list.appendChild(row);
+}
+
+function removeUrl(btn) {
+  if (document.getElementById('url-list').children.length > 1) btn.parentElement.remove();
+}
+
+async function collectSubtitles() {
+  const urls = [...document.querySelectorAll('.url-input')].map(i => i.value.trim()).filter(Boolean);
+  if (!urls.length) return alert('URL을 입력하세요');
+  showLoading(1, true);
+  try {
+    const res = await fetch('/api/collect', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({urls, session_id: SESSION_ID})
+    });
+    const data = await res.json();
+    showLoading(1, false);
+    if (data.success) {
+      const r = data.data;
+      document.getElementById('result1').innerHTML = `
+        <div class="result-box success">
+          <strong>수집 완료: ${r.collected}/${r.total}개</strong>
+          <div style="margin-top:12px;">${r.results.map(v => `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #222;">
+              <span style="color:${v.success?'#4caf50':'#f44336'}">${v.success?'&#10003;':'&#10007;'}</span>
+              <span style="flex:1;font-size:13px;">${v.title}</span>
+              ${v.success ? `<span class="tag">${v.text.length}자</span>` : `<span style="color:#888;font-size:12px;">${v.error}</span>`}
+            </div>`).join('')}
+          </div>
+        </div>`;
+      markDone(1);
+      setTimeout(() => goStep(2), 800);
+    } else {
+      document.getElementById('result1').innerHTML = `<div class="result-box error">오류: ${data.error}</div>`;
+    }
+  } catch(e) {
+    showLoading(1, false);
+    document.getElementById('result1').innerHTML = `<div class="result-box error">${e.message}</div>`;
+  }
+}
+
+// -- 벤치 분석 --
+async function analyzeBench() {
+  showLoading(2, true);
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: SESSION_ID})
+    });
+    const data = await res.json();
+    showLoading(2, false);
+    if (data.success) {
+      const d = data.data;
+      document.getElementById('result2').innerHTML = `
+        <div class="analysis-grid">
+          <div class="analysis-card"><h3>후킹 패턴</h3><ul>${(d.hooking_patterns||[]).map(h=>`<li>${h}</li>`).join('')}</ul></div>
+          <div class="analysis-card"><h3>말투 / 톤</h3><p>${d.tone||'-'}</p></div>
+          <div class="analysis-card"><h3>영상 결</h3><p>${d.style||'-'}</p></div>
+          <div class="analysis-card"><h3>핵심 공식</h3><p style="color:#e50914;font-weight:600;">${d.formula||'-'}</p></div>
+        </div>`;
+      document.getElementById('topic-grid').innerHTML = (d.recommended_topics||[]).map(t =>
+        `<div class="topic-item" onclick="selectTopic(this,'${t.replace(/'/g,"\\'")}')">&#128204; ${t}</div>`
+      ).join('');
+      markDone(2);
+      setTimeout(() => goStep(3), 800);
+    } else {
+      document.getElementById('result2').innerHTML = `<div class="result-box error">오류: ${data.error}</div>`;
+    }
+  } catch(e) {
+    showLoading(2, false);
+    document.getElementById('result2').innerHTML = `<div class="result-box error">${e.message}</div>`;
+  }
+}
+
+function selectTopic(el, topic) {
+  document.querySelectorAll('.topic-item').forEach(t => t.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('topic-input').value = topic;
+}
+
+// -- 대본 생성 --
+async function generateScript() {
+  const topic = document.getElementById('topic-input').value.trim();
+  if (!topic) return alert('주제를 입력하세요');
+  showLoading(3, true);
+  try {
+    const res = await fetch('/api/script', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: SESSION_ID, topic, custom_prompt: document.getElementById('custom-prompt').value})
+    });
+    const data = await res.json();
+    showLoading(3, false);
+    if (data.success) {
+      document.getElementById('result3').innerHTML = `
+        <div class="result-box success">
+          <strong>대본 생성 완료</strong> &middot; ${data.data.scene_count}개 장면
+          <div style="margin-top:12px;">
+            <label>대본 확인 및 수정 후 다음 단계로</label>
+            <textarea id="script-editor" style="min-height:320px;margin-top:8px;">${data.data.script}</textarea>
+            <div class="btn-group">
+              <button class="btn btn-secondary" onclick="saveScript()">수정 저장</button>
+              <button class="btn btn-primary" onclick="goStep(4)">다음 단계 &rarr;</button>
+            </div>
+          </div>
+        </div>`;
+      markDone(3);
+    } else {
+      document.getElementById('result3').innerHTML = `<div class="result-box error">오류: ${data.error}</div>`;
+    }
+  } catch(e) {
+    showLoading(3, false);
+    document.getElementById('result3').innerHTML = `<div class="result-box error">${e.message}</div>`;
+  }
+}
+
+async function saveScript() {
+  const res = await fetch('/api/script/save', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({session_id: SESSION_ID, script: document.getElementById('script-editor').value})
+  });
+  const data = await res.json();
+  if (data.success) {
+    alert(`저장 완료! 장면 ${data.scene_count}개로 파싱됐어요.`);
+  } else {
+    alert('저장 실패: ' + data.error);
+  }
+}
+
+// -- 이미지 생성 --
+async function generateImages() {
+  showLoading(4, true);
+  try {
+    const res = await fetch('/api/images', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: SESSION_ID, style: document.getElementById('image-style').value})
+    });
+    const data = await res.json();
+    showLoading(4, false);
+    if (data.success) {
+      document.getElementById('result4').innerHTML = `<div class="result-box success"><strong>이미지 생성 완료</strong> &middot; ${data.data.generated}/${data.data.total}장</div>`;
+      markDone(4); setTimeout(() => goStep(5), 800);
+    } else {
+      document.getElementById('result4').innerHTML = `<div class="result-box error">오류: ${data.error}</div>`;
+    }
+  } catch(e) { showLoading(4, false); document.getElementById('result4').innerHTML = `<div class="result-box error">${e.message}</div>`; }
+}
+
+// -- TTS --
+async function generateTTS() {
+  showLoading(5, true);
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: SESSION_ID, voice_id: document.getElementById('voice-select').value})
+    });
+    const data = await res.json();
+    showLoading(5, false);
+    if (data.success) {
+      document.getElementById('result5').innerHTML = `<div class="result-box success"><strong>음성 생성 완료</strong> &middot; ${data.data.generated}/${data.data.total}개</div>`;
+      markDone(5); setTimeout(() => goStep(6), 800);
+    } else {
+      document.getElementById('result5').innerHTML = `<div class="result-box error">오류: ${data.error}</div>`;
+    }
+  } catch(e) { showLoading(5, false); document.getElementById('result5').innerHTML = `<div class="result-box error">${e.message}</div>`; }
+}
+
+// -- 무음 제거 --
+async function removeSilence() {
+  showLoading(6, true);
+  try {
+    const res = await fetch('/api/silence', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: SESSION_ID})
+    });
+    const data = await res.json();
+    showLoading(6, false);
+    if (data.success) {
+      document.getElementById('result6').innerHTML = `<div class="result-box success"><strong>완료</strong> &middot; ${data.data.processed}개 처리</div>`;
+      markDone(6); setTimeout(() => goStep(7), 800);
+    } else {
+      document.getElementById('result6').innerHTML = `<div class="result-box error">오류: ${data.error}</div>`;
+    }
+  } catch(e) { showLoading(6, false); document.getElementById('result6').innerHTML = `<div class="result-box error">${e.message}</div>`; }
+}
+
+function skipSilence() { markDone(6); goStep(7); }
+
+// -- 숏폼 만들기 (direct - no proxy) --
+function openShortformPanel() {
+  const area = document.getElementById('shortform-area');
+  area.innerHTML = `
+    <div class="shortform-settings">
+      <h3>&#9986;&#65039; 숏폼 설정</h3>
+      <div class="sf-row">
+        <div>
+          <label>숏폼 길이</label>
+          <select id="sf-duration">
+            <option value="15-30">15~30초</option>
+            <option value="30-60" selected>30~60초</option>
+            <option value="60-90">60~90초</option>
+            <option value="90-120">90~120초</option>
+          </select>
+        </div>
+        <div>
+          <label>숏폼 개수</label>
+          <select id="sf-count">
+            ${[3,5,7,10].map(n => `<option value="${n}" ${n===7?'selected':''}>${n}개</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="startShortform()" style="width:100%;">숏폼 생성 시작</button>
+        </div>
+      </div>
+      <p style="margin-top:10px;font-size:11px;color:#888;">같은 서버에서 직접 처리됩니다 (별도 서버 불필요)</p>
+    </div>`;
+}
+
+async function startShortform() {
+  const area = document.getElementById('shortform-area');
+  const duration = document.getElementById('sf-duration').value;
+  const count = document.getElementById('sf-count').value;
+
+  area.innerHTML = `
+    <div class="shortform-settings">
+      <h3>&#9986;&#65039; 숏폼 생성 중...</h3>
+      <div class="sf-progress">
+        <div class="sf-step active" id="sf-s1"><span class="sf-dot"></span>영상 분석 준비 중</div>
+        <div class="sf-step" id="sf-s2"><span class="sf-dot"></span>음성 인식 중 (Whisper)</div>
+        <div class="sf-step" id="sf-s3"><span class="sf-dot"></span>AI 구간 분석 중 (Claude)</div>
+        <div class="sf-step" id="sf-s4"><span class="sf-dot"></span>숏폼 영상 생성 중</div>
+      </div>
+      <p style="margin-top:12px;font-size:11px;color:#888;">전체 과정에 5~10분 소요됩니다. 잠시만 기다려주세요.</p>
+    </div>`;
+
+  const steps = [
+    { id: 'sf-s1', delay: 0 },
+    { id: 'sf-s2', delay: 5000 },
+    { id: 'sf-s3', delay: 30000 },
+    { id: 'sf-s4', delay: 60000 },
+  ];
+  const timers = [];
+  for (let i = 1; i < steps.length; i++) {
+    timers.push(setTimeout(() => {
+      document.getElementById(steps[i-1].id)?.classList.replace('active', 'done');
+      document.getElementById(steps[i].id)?.classList.add('active');
+    }, steps[i].delay));
+  }
+
+  try {
+    const res = await fetch('/api/shortform', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        session_id: SESSION_ID,
+        num_shorts: parseInt(count),
+        duration_preset: duration
+      }),
+      signal: AbortSignal.timeout(660000)
+    });
+    const data = await res.json();
+    timers.forEach(t => clearTimeout(t));
+
+    if (data.success && data.data.shorts) {
+      const shorts = data.data.shorts;
+      const sid = data.data.session_id;
+
+      area.innerHTML = `
+        <div class="shortform-settings">
+          <h3 style="color:#4caf50;">&#10004; 숏폼 ${shorts.length}개 생성 완료!</h3>
+          <div class="sf-results">
+            ${shorts.map((s, i) => `
+              <div class="sf-result-item">
+                <div class="sf-num">${i+1}</div>
+                <div class="sf-info">
+                  <div class="sf-title">${(s.title||'').replace(/\n/g, ' ')}</div>
+                  <div class="sf-meta">${s.timeline || ''} &middot; ${s.duration || 0}초</div>
+                </div>
+              </div>`).join('')}
+          </div>
+          <div style="margin-top:16px;text-align:center;">
+            <a href="/shortform#project/${sid}" target="_blank" class="btn" style="background:#7c6fff;color:#fff;text-decoration:none;display:inline-block;">
+              숏폼 편집기에서 열기 &rarr;
+            </a>
+          </div>
+        </div>`;
+    } else {
+      area.innerHTML = `<div class="result-box error" style="margin-top:16px;">숏폼 생성 실패: ${data.error || '알 수 없는 오류'}</div>`;
+    }
+  } catch(e) {
+    timers.forEach(t => clearTimeout(t));
+    area.innerHTML = `<div class="result-box error" style="margin-top:16px;">오류: ${e.message}</div>`;
+  }
+}
+
+// -- 영상 조합 --
+async function assembleVideo() {
+  showLoading(7, true);
+  try {
+    const res = await fetch('/api/assemble', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        session_id: SESSION_ID,
+        add_subtitle: document.getElementById('add-subtitle').checked,
+        subtitle_style: document.getElementById('subtitle-style').value
+      })
+    });
+    const data = await res.json();
+    showLoading(7, false);
+    if (data.success) {
+      const d = data.data;
+      document.getElementById('result7').innerHTML = `
+        <div class="final-card">
+          <h2>&#127881; 영상 완성!</h2>
+          <p>${d.clip_count}개 장면 &middot; ${d.total_duration}초 &middot; ${d.file_size_mb}MB</p>
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+            <a href="/api/download/${SESSION_ID}" class="btn btn-primary" style="text-decoration:none;display:inline-block;">&#11015;&#65039; 영상 다운로드</a>
+            <button class="btn" style="background:#7c6fff;color:#fff;" onclick="openShortformPanel()">&#9986;&#65039; 숏폼 만들기</button>
+          </div>
+          <div id="shortform-area"></div>
+        </div>`;
+      markDone(7);
+    } else {
+      document.getElementById('result7').innerHTML = `<div class="result-box error">오류: ${data.error}</div>`;
+    }
+  } catch(e) { showLoading(7, false); document.getElementById('result7').innerHTML = `<div class="result-box error">${e.message}</div>`; }
+}
+</script>
+</body>
+</html>
