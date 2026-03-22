@@ -22,7 +22,7 @@ load_dotenv()
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
 app.config['OUTPUT_FOLDER'] = os.path.join(APP_ROOT, 'output')
 app.config['TEMP_FOLDER'] = os.path.join(APP_ROOT, 'temp')
 

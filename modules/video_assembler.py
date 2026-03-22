@@ -67,7 +67,7 @@ def assemble_video(session_id: str, add_subtitle: bool = True, subtitle_style: s
                     '-c:v', 'libx264', '-r', '25', '-pix_fmt', 'yuv420p',
                     '-an', sub_path
                 ]
-                result = subprocess.run(cmd, capture_output=True, timeout=120)
+                result = subprocess.run(cmd, capture_output=True, timeout=600)
                 if result.returncode != 0:
                     # fallback: 단순 스케일
                     cmd_s = [
@@ -78,7 +78,7 @@ def assemble_video(session_id: str, add_subtitle: bool = True, subtitle_style: s
                         '-c:v', 'libx264', '-r', '25', '-pix_fmt', 'yuv420p',
                         '-an', sub_path
                     ]
-                    subprocess.run(cmd_s, capture_output=True, timeout=120)
+                    subprocess.run(cmd_s, capture_output=True, timeout=600)
                 sub_clips.append(sub_path)
 
             # 서브클립 concat
@@ -91,7 +91,7 @@ def assemble_video(session_id: str, add_subtitle: bool = True, subtitle_style: s
             subprocess.run([
                 'ffmpeg', '-y', '-f', 'concat', '-safe', '0',
                 '-i', sub_list_path, '-c', 'copy', video_only
-            ], capture_output=True, timeout=120)
+            ], capture_output=True, timeout=600)
 
             # 오디오 합성
             clip_path = os.path.join(session_dir, f'clip_{idx:03d}.mp4')
@@ -100,7 +100,7 @@ def assemble_video(session_id: str, add_subtitle: bool = True, subtitle_style: s
                 '-i', video_only, '-i', aud_path,
                 '-c:v', 'copy', '-c:a', 'aac', '-shortest',
                 clip_path
-            ], capture_output=True, timeout=120)
+            ], capture_output=True, timeout=600)
 
         else:
             # 단일 이미지 (기존 방식)
@@ -118,7 +118,7 @@ def assemble_video(session_id: str, add_subtitle: bool = True, subtitle_style: s
                     '-shortest', '-t', str(duration), '-r', '25',
                     clip_path
                 ]
-                result = subprocess.run(cmd, capture_output=True, timeout=120)
+                result = subprocess.run(cmd, capture_output=True, timeout=600)
                 if result.returncode != 0:
                     cmd_simple = [
                         'ffmpeg', '-y',
@@ -129,7 +129,7 @@ def assemble_video(session_id: str, add_subtitle: bool = True, subtitle_style: s
                         '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
                         clip_path
                     ]
-                    subprocess.run(cmd_simple, capture_output=True, timeout=120, check=True)
+                    subprocess.run(cmd_simple, capture_output=True, timeout=600, check=True)
             except Exception as e:
                 print(f"클립 {idx} 생성 실패: {e}")
                 continue
@@ -181,7 +181,7 @@ def assemble_video(session_id: str, add_subtitle: bool = True, subtitle_style: s
         '-c', 'copy',
         merged_path
     ]
-    subprocess.run(merge_cmd, capture_output=True, timeout=300, check=True)
+    subprocess.run(merge_cmd, capture_output=True, timeout=1800, check=True)
 
     # 자막 삽입
     final_path = os.path.join(OUTPUT, f'{session_id}_final.mp4')
@@ -196,7 +196,7 @@ def assemble_video(session_id: str, add_subtitle: bool = True, subtitle_style: s
             '-c:a', 'copy',
             final_path
         ]
-        result = subprocess.run(subtitle_cmd, capture_output=True, timeout=300)
+        result = subprocess.run(subtitle_cmd, capture_output=True, timeout=1800)
         if result.returncode != 0:
             import shutil
             shutil.copy2(merged_path, final_path)

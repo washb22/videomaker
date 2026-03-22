@@ -3,8 +3,9 @@ import anthropic
 
 TEMP = 'temp'
 
+
 def generate_script(session_id: str, topic: str, custom_prompt: str = '') -> dict:
-    """벤치 분석 결과를 바탕으로 대본 생성"""
+    """벤치 분석 결과를 바탕으로 대본 생성 - 긴 영상은 파트별 분할 생성"""
     session_dir = os.path.join(TEMP, session_id)
     analysis_path = os.path.join(session_dir, 'analysis.json')
 
@@ -18,7 +19,56 @@ def generate_script(session_id: str, topic: str, custom_prompt: str = '') -> dic
     style = analysis.get('style', '')
     formula = analysis.get('formula', '')
 
-    prompt = f"""당신은 유튜브 대본 전문가입니다.
+    # custom_prompt에서 목표 장면 수 추출 (없으면 기본 10~15)
+    scene_target = _extract_scene_count(custom_prompt)
+
+    if scene_target and scene_target > 20:
+        # 20장면 초과 → 파트 분할 생성
+        script_text = _generate_long_script(
+            client, topic, custom_prompt, hooking, tone, style, formula, scene_target
+        )
+    else:
+        # 기본: 단일 호출
+        scene_range = f"{scene_target}개" if scene_target else "10~15개"
+        script_text = _generate_single_script(
+            client, topic, custom_prompt, hooking, tone, style, formula, scene_range
+        )
+
+    # 저장
+    script_path = os.path.join(session_dir, 'script_draft.txt')
+    final_path = os.path.join(session_dir, 'script_final.txt')
+    with open(script_path, 'w', encoding='utf-8') as f:
+        f.write(script_text)
+    with open(final_path, 'w', encoding='utf-8') as f:
+        f.write(script_text)
+
+    # 장면 파싱
+    scenes = parse_scenes(script_text)
+
+    # 장면 데이터 저장
+    with open(os.path.join(session_dir, 'scenes.json'), 'w', encoding='utf-8') as f:
+        json.dump(scenes, f, ensure_ascii=False, indent=2)
+
+    return {
+        'script': script_text,
+        'scenes': scenes,
+        'scene_count': len(scenes)
+    }
+
+
+def _extract_scene_count(custom_prompt: str) -> int:
+    """추가 지시사항에서 목표 장면 수 추출"""
+    if not custom_prompt:
+        return 0
+    match = re.search(r'(\d+)\s*(?:개\s*)?(?:장면|씬|scene)', custom_prompt, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    return 0
+
+
+def _build_base_prompt(topic, custom_prompt, hooking, tone, style, formula, scene_instruction):
+    """공통 프롬프트 빌더"""
+    return f"""당신은 유튜브 대본 전문가입니다.
 벤치마킹 채널 분석 결과를 바탕으로 아래 주제의 유튜브 영상 대본을 작성하세요.
 
 [벤치 분석 결과]
@@ -57,39 +107,71 @@ def generate_script(session_id: str, topic: str, custom_prompt: str = '') -> dic
 이미지: (여기에 이미지 설명)
 
 6. 각 장면의 나레이션은 최소 3~5문장 이상으로 충분히 작성
-7. 전체 장면 수: 10~15개
+{scene_instruction}
 8. 나레이션과 이미지 설명을 반드시 분리해서 작성할 것
 
 대본만 작성하세요."""
 
+
+def _generate_single_script(client, topic, custom_prompt, hooking, tone, style, formula, scene_range):
+    """단일 API 호출로 대본 생성 (20장면 이하)"""
+    scene_instruction = f"7. 전체 장면 수: {scene_range}"
+    prompt = _build_base_prompt(topic, custom_prompt, hooking, tone, style, formula, scene_instruction)
+
     message = client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=6000,
+        max_tokens=16000,
         messages=[{"role": "user", "content": prompt}]
     )
+    return message.content[0].text
 
-    script_text = message.content[0].text
 
-    # 저장
-    script_path = os.path.join(session_dir, 'script_draft.txt')
-    final_path = os.path.join(session_dir, 'script_final.txt')
-    with open(script_path, 'w', encoding='utf-8') as f:
-        f.write(script_text)
-    with open(final_path, 'w', encoding='utf-8') as f:
-        f.write(script_text)
+def _generate_long_script(client, topic, custom_prompt, hooking, tone, style, formula, total_scenes):
+    """긴 대본을 파트별로 분할 생성 (20장면 초과)"""
+    scenes_per_part = 15
+    num_parts = (total_scenes + scenes_per_part - 1) // scenes_per_part
+    all_parts = []
 
-    # 장면 파싱
-    scenes = parse_scenes(script_text)
+    for part_idx in range(num_parts):
+        start_scene = part_idx * scenes_per_part + 1
+        end_scene = min((part_idx + 1) * scenes_per_part, total_scenes)
+        is_first = part_idx == 0
+        is_last = part_idx == num_parts - 1
 
-    # 장면 데이터 저장
-    with open(os.path.join(session_dir, 'scenes.json'), 'w', encoding='utf-8') as f:
-        json.dump(scenes, f, ensure_ascii=False, indent=2)
+        # 파트별 컨텍스트 구성
+        if is_first:
+            part_context = f"전체 {total_scenes}개 장면 중 파트 1 (장면 {start_scene}~{end_scene})을 작성하세요. 강력한 후킹으로 시작하세요."
+        elif is_last:
+            part_context = f"전체 {total_scenes}개 장면 중 마지막 파트 (장면 {start_scene}~{end_scene})을 작성하세요. 마무리와 CTA를 포함하세요."
+        else:
+            part_context = f"전체 {total_scenes}개 장면 중 파트 {part_idx+1} (장면 {start_scene}~{end_scene})을 작성하세요."
 
-    return {
-        'script': script_text,
-        'scenes': scenes,
-        'scene_count': len(scenes)
-    }
+        # 이전 파트 마지막 장면을 컨텍스트로 제공
+        prev_context = ""
+        if all_parts:
+            prev_scenes = parse_scenes(all_parts[-1])
+            if prev_scenes:
+                last_scene = prev_scenes[-1]
+                prev_context = f"\n\n[이전 파트 마지막 장면 요약 - 이어서 자연스럽게 연결할 것]\n나레이션: {last_scene['narration'][:200]}..."
+
+        scene_instruction = f"7. 이 파트에서 장면 번호는 [장면{start_scene}]부터 [장면{end_scene}]까지 작성할 것"
+
+        prompt = _build_base_prompt(topic, custom_prompt, hooking, tone, style, formula, scene_instruction)
+        prompt += f"\n\n{part_context}{prev_context}"
+
+        print(f"[대본 생성] 파트 {part_idx+1}/{num_parts} (장면 {start_scene}~{end_scene}) 생성 중...")
+
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=16000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        part_text = message.content[0].text
+        all_parts.append(part_text)
+
+    # 모든 파트 결합
+    return "\n\n".join(all_parts)
 
 
 def parse_scenes(script: str) -> list:

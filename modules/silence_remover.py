@@ -30,7 +30,7 @@ def remove_silence(session_id: str) -> dict:
                 '-af', 'silenceremove=start_periods=1:start_silence=0.3:start_threshold=-40dB:stop_periods=-1:stop_silence=0.3:stop_threshold=-40dB',
                 output_path
             ]
-            subprocess.run(cmd, capture_output=True, check=True, timeout=60)
+            subprocess.run(cmd, capture_output=True, check=True, timeout=180)
 
             # 길이 측정
             duration = get_audio_duration(output_path)
