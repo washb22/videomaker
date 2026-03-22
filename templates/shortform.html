@@ -678,6 +678,17 @@
             <span id="titleLetterSVal" style="font-size:13px;min-width:28px;text-align:right">0</span>
           </div>
         </div>
+
+        <!-- 텍스트 위치 -->
+        <div class="edit-row">
+          <div class="edit-label">텍스트 위치</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--muted)">위</span>
+            <input id="titlePosY" type="range" min="0" max="400" value="210" style="flex:1;accent-color:var(--accent)" oninput="updateTitleStyle();document.getElementById('titlePosYVal').textContent=this.value">
+            <span style="font-size:11px;color:var(--muted)">아래</span>
+            <span id="titlePosYVal" style="font-size:13px;min-width:28px;text-align:right">210</span>
+          </div>
+        </div>
       </div>
 
       <!-- 구간 편집 탭 -->
@@ -1028,7 +1039,8 @@ const defaultTitleStyle = () => ({
   bgColor: 'none',
   outline: 'strong',
   lineH: 16,
-  letterS: 0
+  letterS: 0,
+  posY: 210
 });
 
 let titleStyle = defaultTitleStyle();
@@ -1058,6 +1070,10 @@ function syncStyleUI() {
   const lsEl = document.getElementById('titleLetterS');
   const lsVal = document.getElementById('titleLetterSVal');
   if (lsEl) { lsEl.value = s.letterS; if (lsVal) lsVal.textContent = s.letterS; }
+  // 텍스트 위치
+  const posEl = document.getElementById('titlePosY');
+  const posVal = document.getElementById('titlePosYVal');
+  if (posEl) { posEl.value = s.posY ?? 210; if (posVal) posVal.textContent = s.posY ?? 210; }
   // 외곽선 버튼
   document.querySelectorAll('.outline-btn').forEach(b =>
     b.classList.toggle('selected', b.dataset.val === s.outline));
@@ -1160,8 +1176,8 @@ function drawTitleOnCanvas(ctx, title) {
 
   const lineHpx = fontSize + lineH;
   const totalH = lineHpx * lines.length;
-  const videoY = 420;
-  const startY = (videoY - totalH) / 2 + fontSize * 0.85;
+  const posY = titleStyle.posY ?? 210;
+  const startY = posY - totalH / 2 + fontSize * 0.85;
 
   lines.forEach(({ text, offset }, i) => {
     const y = startY + i * lineHpx;
@@ -1258,6 +1274,7 @@ function updateTitleStyle() {
   titleStyle.size    = parseInt(document.getElementById('titleSize').value);
   titleStyle.lineH   = parseInt(document.getElementById('titleLineH').value);
   titleStyle.letterS = parseInt(document.getElementById('titleLetterS').value);
+  titleStyle.posY    = parseInt(document.getElementById('titlePosY').value);
   redrawCanvas();
 }
 
@@ -1460,7 +1477,7 @@ async function downloadCurrent() {
 
 // 특정 ctx + videoY 높이에 제목만 그리는 함수 (downloadCurrent용)
 function drawTitleOnCanvasTo(ctx, title, videoY) {
-  const { font, size, color, bgColor, outline, lineH } = titleStyle;
+  const { font, size, color, bgColor, outline, lineH, posY } = titleStyle;
   const fontSize = size;
   const baseFont = `900 ${fontSize}px '${font}', 'Malgun Gothic', sans-serif`;
   ctx.font = baseFont;
@@ -1497,7 +1514,8 @@ function drawTitleOnCanvasTo(ctx, title, videoY) {
 
   const lineHpx = fontSize + lineH;
   const totalH = lineHpx * lines.length;
-  const startY = (videoY - totalH) / 2 + fontSize * 0.85;
+  const effectivePosY = posY ?? Math.round(videoY / 2);
+  const startY = effectivePosY - totalH / 2 + fontSize * 0.85;
 
   lines.forEach(({ text, offset }, i) => {
     const y = startY + i * lineHpx;
