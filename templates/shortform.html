@@ -1430,18 +1430,16 @@ async function downloadCurrent() {
   showToast('다운로드 준비 중...', 'success');
 
   try {
-    // 1. 캔버스에서 제목 영역 PNG 캡처 (영상 시작점까지 전체 높이)
+    // 1. 캔버스에서 제목 PNG 캡처 (전체 높이로 잘림 방지)
     const canvas = document.getElementById('previewCanvas');
-    const titleAreaH = 420;
     const titleCanvas = document.createElement('canvas');
     titleCanvas.width  = 1080;
-    titleCanvas.height = titleAreaH;
+    titleCanvas.height = 1920;
     const tCtx = titleCanvas.getContext('2d');
 
-    // 검정 배경 없이 투명으로 제목만 그리기
-    tCtx.clearRect(0, 0, 1080, titleAreaH);
-    // 현재 titleStyle + titleSegments로 제목만 다시 그림
-    drawTitleOnCanvasTo(tCtx, title, titleAreaH);
+    // 투명 배경에 제목만 그리기
+    tCtx.clearRect(0, 0, 1080, 1920);
+    drawTitleOnCanvasTo(tCtx, title, 420);
 
     const pngBlob = await new Promise(res => titleCanvas.toBlob(res, 'image/png'));
     const pngBase64 = await new Promise((res, rej) => {
