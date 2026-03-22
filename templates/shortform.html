@@ -684,7 +684,7 @@
           <div class="edit-label">텍스트 위치</div>
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:11px;color:var(--muted)">위</span>
-            <input id="titlePosY" type="range" min="0" max="400" value="210" style="flex:1;accent-color:var(--accent)" oninput="updateTitleStyle();document.getElementById('titlePosYVal').textContent=this.value">
+            <input id="titlePosY" type="range" min="50" max="350" value="210" style="flex:1;accent-color:var(--accent)" oninput="updateTitleStyle();document.getElementById('titlePosYVal').textContent=this.value">
             <span style="font-size:11px;color:var(--muted)">아래</span>
             <span id="titlePosYVal" style="font-size:13px;min-width:28px;text-align:right">210</span>
           </div>
@@ -1430,17 +1430,18 @@ async function downloadCurrent() {
   showToast('다운로드 준비 중...', 'success');
 
   try {
-    // 1. 캔버스에서 제목 영역(1080x420) PNG 캡처
+    // 1. 캔버스에서 제목 영역 PNG 캡처 (영상 시작점까지 전체 높이)
     const canvas = document.getElementById('previewCanvas');
+    const titleAreaH = 420;
     const titleCanvas = document.createElement('canvas');
     titleCanvas.width  = 1080;
-    titleCanvas.height = 420;
+    titleCanvas.height = titleAreaH;
     const tCtx = titleCanvas.getContext('2d');
 
     // 검정 배경 없이 투명으로 제목만 그리기
-    tCtx.clearRect(0, 0, 1080, 420);
+    tCtx.clearRect(0, 0, 1080, titleAreaH);
     // 현재 titleStyle + titleSegments로 제목만 다시 그림
-    drawTitleOnCanvasTo(tCtx, title, 420);
+    drawTitleOnCanvasTo(tCtx, title, titleAreaH);
 
     const pngBlob = await new Promise(res => titleCanvas.toBlob(res, 'image/png'));
     const pngBase64 = await new Promise((res, rej) => {
