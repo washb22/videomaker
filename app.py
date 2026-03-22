@@ -474,7 +474,7 @@ def sf_download_short(session_id, short_id):
             title_img_path, title_img_h = sf.make_title_image(
                 title, font_name=font_name, font_size=font_size,
                 color=color, outline=outline, line_h=line_h)
-            title_y = max(20, (420 - title_img_h) // 2)
+            title_y = max(20, 420 - title_img_h - 5)
 
         result = subprocess.run([
             "ffmpeg", "-y",
