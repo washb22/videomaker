@@ -600,7 +600,7 @@ def render_with_title(raw_path: str, title: str, out_path: str,
             segments=segments or []
         )
         video_y = 420
-        title_y = max(40, (video_y - title_img_h) // 2)
+        title_y = max(40, video_y - title_img_h - 20)
 
         result = subprocess.run([
             "ffmpeg", "-y",
